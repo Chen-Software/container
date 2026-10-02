@@ -20,6 +20,7 @@ export const ComposeHandle = native.ComposeHandle;
 export const ComposeSystemHandle = native.ComposeSystemHandle;
 
 export const ContainerCli = native.ContainerCli;
+export const ContainerBuildCli = native.ContainerBuildCli;
 export const ContainerComposeCli = native.ContainerComposeCli;
 
 export const HealthState = {

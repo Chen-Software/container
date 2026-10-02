@@ -67,10 +67,10 @@ test("Container new CLI methods work", async () => {
 test("Container CLI handlers work", async () => {
   const cliHandler = new ContainerCliHandler();
   const built = await cliHandler.build("./");
-  expect(built).toBe("image-built:latest");
+  expect(built).toBe("built image from ./");
 
   const buildResult = await handleContainerBuild("./");
-  expect(buildResult).toBe("image-built:latest");
+  expect(buildResult).toBe("built image from ./");
 
   const composeCliHandler = new ContainerComposeCliHandler();
   expect(await composeCliHandler.version()).toContain("container-compose");
