@@ -1,18 +1,20 @@
+pub mod cli;
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use virtfw_varstore::store::EfiVarStore;
+use virtfw_varstore::store::EfiVarStore as InnerEfiVarStore;
 
 #[napi(object)]
 #[derive(Clone, Debug, Default)]
-pub struct JsOptions {
+pub struct Options {
   pub home_dir: Option<String>,
 }
 
 #[napi(object)]
 #[derive(Clone, Debug, Default)]
-pub struct JsContainerOptions {
+pub struct ContainerOptions {
   pub image: Option<String>,
   pub memory_mib: Option<i32>,
   pub cpus: Option<i32>,
@@ -27,13 +29,13 @@ pub struct JsContainerOptions {
 
 #[napi(object)]
 #[derive(Clone, Debug, Default)]
-pub struct JsContainerRestOptions {
+pub struct ContainerRestOptions {
   pub endpoint: Option<String>,
 }
 
 #[napi(object)]
 #[derive(Clone, Debug)]
-pub struct JsPublishedPort {
+pub struct PublishedPort {
   #[napi(js_name = "guestPort")]
   pub guest_port: u32,
   #[napi(js_name = "hostIp")]
@@ -45,7 +47,7 @@ pub struct JsPublishedPort {
 
 #[napi(object)]
 #[derive(Clone, Debug)]
-pub struct JsOutboundNetworkInfo {
+pub struct OutboundNetworkInfo {
   pub mode: String,
   #[napi(js_name = "allowNet")]
   pub allow_net: Vec<String>,
@@ -53,7 +55,7 @@ pub struct JsOutboundNetworkInfo {
 
 #[napi(object)]
 #[derive(Clone, Debug)]
-pub struct JsInboundNetworkInfo {
+pub struct InboundNetworkInfo {
   pub mode: String,
   #[napi(js_name = "allowNet")]
   pub allow_net: Vec<String>,
@@ -61,19 +63,19 @@ pub struct JsInboundNetworkInfo {
 
 #[napi(object, use_nullable = true)]
 #[derive(Clone, Debug)]
-pub struct JsNetworkInfo {
-  pub outbound: JsOutboundNetworkInfo,
-  pub inbound: JsInboundNetworkInfo,
+pub struct NetworkInfo {
+  pub outbound: OutboundNetworkInfo,
+  pub inbound: InboundNetworkInfo,
   pub mode: String,
   #[napi(js_name = "allowNet")]
   pub allow_net: Vec<String>,
   #[napi(js_name = "publishedPorts")]
-  pub published_ports: Option<Vec<JsPublishedPort>>,
+  pub published_ports: Option<Vec<PublishedPort>>,
 }
 
 #[napi(string_enum)]
 #[derive(Clone, Debug)]
-pub enum JsHealthState {
+pub enum HealthState {
   None,
   Starting,
   Healthy,
@@ -82,15 +84,15 @@ pub enum JsHealthState {
 
 #[napi(object)]
 #[derive(Clone, Debug)]
-pub struct JsHealthStatus {
-  pub state: JsHealthState,
+pub struct HealthStatus {
+  pub state: HealthState,
   pub failures: u32,
   pub last_check: Option<String>,
 }
 
 #[napi(object)]
 #[derive(Clone, Debug, Default)]
-pub struct JsContainerStateInfo {
+pub struct ContainerStateInfo {
   pub status: String,
   pub running: bool,
   pub pid: Option<u32>,
@@ -99,50 +101,68 @@ pub struct JsContainerStateInfo {
 
 #[napi(object)]
 #[derive(Clone, Debug)]
-pub struct JsContainerInfo {
+pub struct ContainerInfo {
   pub id: String,
   pub name: Option<String>,
-  pub state: JsContainerStateInfo,
+  pub state: ContainerStateInfo,
   pub created_at: String,
   pub started_at: Option<String>,
   pub last_activity_at: Option<String>,
   pub image: String,
   pub cpus: u32,
   pub memory_mib: u32,
-  pub network: Either<JsNetworkInfo, Null>,
+  pub network: Either<NetworkInfo, Null>,
   #[napi(js_name = "autoStop")]
   pub auto_stop: u32,
   #[napi(js_name = "autoDelete")]
   pub auto_delete: u32,
   #[napi(js_name = "autoResume")]
   pub auto_resume: bool,
-  pub health_status: JsHealthStatus,
+  pub health_status: HealthStatus,
 }
 
 #[napi(object)]
 #[derive(Clone, Debug, Default)]
-pub struct JsBuildOptions {
+pub struct BuildOptions {
   pub dockerfile: Option<String>,
   pub target: Option<String>,
   pub build_args: Option<HashMap<String, String>>,
   pub tags: Option<Vec<String>>,
+  pub arch: Option<Vec<String>>,
+  pub cache_in: Option<Vec<String>>,
+  pub cache_out: Option<Vec<String>>,
+  pub cpus: Option<i64>,
+  pub file: Option<String>,
+  pub label: Option<Vec<String>>,
+  pub memory: Option<String>,
+  pub no_cache: Option<bool>,
+  pub output: Option<Vec<String>>,
+  pub os: Option<Vec<String>>,
+  pub platform: Option<Vec<String>>,
+  pub progress: Option<String>,
+  pub quiet: Option<bool>,
+  pub secret: Option<Vec<String>>,
+  pub ssh: Option<String>,
+  pub vsock_port: Option<u32>,
+  pub context_dir: Option<String>,
+  pub pull: Option<bool>,
 }
 
 #[napi(object)]
 #[derive(Clone, Debug, Default)]
-pub struct JsRuntimeMetrics {
+pub struct RuntimeMetrics {
   pub containeres_created_total: i64,
   pub num_running_containeres: i64,
 }
 
 #[napi]
 #[derive(Clone, Debug, Default)]
-pub struct JsBuildTransfer {
+pub struct BuildTransfer {
   metadata: HashMap<String, String>,
 }
 
 #[napi]
-impl JsBuildTransfer {
+impl BuildTransfer {
   #[napi(constructor)]
   pub fn new(metadata: Option<HashMap<String, String>>) -> Self {
     Self {
@@ -233,12 +253,12 @@ impl JsBuildTransfer {
 
 #[napi]
 #[derive(Clone, Debug, Default)]
-pub struct JsImageTransfer {
+pub struct ImageTransfer {
   metadata: HashMap<String, String>,
 }
 
 #[napi]
-impl JsImageTransfer {
+impl ImageTransfer {
   #[napi(constructor)]
   pub fn new(metadata: Option<HashMap<String, String>>) -> Self {
     Self {
@@ -297,44 +317,44 @@ impl JsImageTransfer {
 
 #[napi(object)]
 #[derive(Clone, Debug, Default)]
-pub struct JsIo {
+pub struct Io {
   pub data: Vec<u8>,
 }
 
 #[napi(object)]
 #[derive(Clone, Debug, Default)]
-pub struct JsInfoRequest {
+pub struct InfoRequest {
   pub id: String,
 }
 
 #[napi(object)]
 #[derive(Clone, Debug, Default)]
-pub struct JsInfoResponse {
+pub struct InfoResponse {
   pub id: String,
   pub status: String,
 }
 
 #[napi(object)]
 #[derive(Clone, Debug, Default)]
-pub struct JsClientStream {
+pub struct ClientStream {
   pub data: Vec<u8>,
 }
 
 #[napi]
 #[derive(Clone, Debug, Default)]
-pub struct JsServerStream {
-  image_transfer: Option<JsImageTransfer>,
-  build_transfer: Option<JsBuildTransfer>,
-  io: Option<JsIo>,
+pub struct ServerStream {
+  image_transfer: Option<ImageTransfer>,
+  build_transfer: Option<BuildTransfer>,
+  io: Option<Io>,
 }
 
 #[napi]
-impl JsServerStream {
+impl ServerStream {
   #[napi(constructor)]
   pub fn new(
-    image_transfer: Option<&JsImageTransfer>,
-    build_transfer: Option<&JsBuildTransfer>,
-    io: Option<JsIo>,
+    image_transfer: Option<&ImageTransfer>,
+    build_transfer: Option<&BuildTransfer>,
+    io: Option<Io>,
   ) -> Self {
     Self {
       image_transfer: image_transfer.cloned(),
@@ -344,26 +364,26 @@ impl JsServerStream {
   }
 
   #[napi]
-  pub fn get_image_transfer(&self) -> Option<JsImageTransfer> {
+  pub fn get_image_transfer(&self) -> Option<ImageTransfer> {
     self.image_transfer.clone()
   }
 
   #[napi]
-  pub fn get_build_transfer(&self) -> Option<JsBuildTransfer> {
+  pub fn get_build_transfer(&self) -> Option<BuildTransfer> {
     self.build_transfer.clone()
   }
 
   #[napi]
-  pub fn get_io(&self) -> Option<JsIo> {
+  pub fn get_io(&self) -> Option<Io> {
     self.io.clone()
   }
 }
 
 #[napi]
-pub struct JsImageHandle {}
+pub struct ImageHandle {}
 
 #[napi]
-impl JsImageHandle {
+impl ImageHandle {
   #[napi]
   pub fn list(&self) -> Vec<String> {
     vec![]
@@ -418,16 +438,16 @@ impl JsImageHandle {
   }
 
   #[napi]
-  pub fn build(&self, _context_dir: String, _options: Option<JsBuildOptions>) -> Result<String> {
+  pub fn build(&self, _context_dir: String, _options: Option<BuildOptions>) -> Result<String> {
     Ok("image-built:latest".to_string())
   }
 }
 
 #[napi]
-pub struct JsVolumeHandle {}
+pub struct VolumeHandle {}
 
 #[napi]
-impl JsVolumeHandle {
+impl VolumeHandle {
   #[napi]
   pub fn list(&self) -> Vec<String> {
     vec![]
@@ -463,10 +483,10 @@ impl JsVolumeHandle {
 }
 
 #[napi]
-pub struct JsMachineHandle {}
+pub struct MachineHandle {}
 
 #[napi]
-impl JsMachineHandle {
+impl MachineHandle {
   #[napi]
   pub fn create(&self, image: String, _name: Option<String>) -> Result<String> {
     Ok(format!("machine_{image}"))
@@ -525,11 +545,11 @@ impl JsMachineHandle {
   }
 }
 
-#[napi(js_name = "JsK8sHandle")]
-pub struct JsK8sHandle {}
+#[napi]
+pub struct K8sHandle {}
 
 #[napi]
-impl JsK8sHandle {
+impl K8sHandle {
   #[napi]
   pub fn create(&self, name: Option<String>, _cpus: Option<i32>, _memory: Option<String>) -> Result<String> {
     Ok(name.unwrap_or_else(|| "k8s-dev".to_string()))
@@ -557,10 +577,10 @@ impl JsK8sHandle {
 }
 
 #[napi]
-pub struct JsNetworkHandle {}
+pub struct NetworkHandle {}
 
 #[napi]
-impl JsNetworkHandle {
+impl NetworkHandle {
   #[napi]
   pub fn create(&self, name: String, _plugin: Option<String>, _subnet: Option<String>) -> Result<String> {
     Ok(name)
@@ -595,10 +615,10 @@ impl JsNetworkHandle {
 }
 
 #[napi]
-pub struct JsRegistryHandle {}
+pub struct RegistryHandle {}
 
 #[napi]
-impl JsRegistryHandle {
+impl RegistryHandle {
   #[napi]
   pub fn login(&self, _server: String, _username: Option<String>, _password: Option<String>) -> Result<()> {
     Ok(())
@@ -616,12 +636,12 @@ impl JsRegistryHandle {
 }
 
 #[napi]
-pub struct JsBuilderHandle {}
+pub struct BuilderHandle {}
 
 #[napi]
-impl JsBuilderHandle {
+impl BuilderHandle {
   #[napi]
-  pub fn start(&self) -> Result<String> {
+  pub fn start(&self, _cpus: Option<i64>, _memory: Option<String>, _dns: Option<Vec<String>>) -> Result<String> {
     Ok("buildkit".to_string())
   }
 
@@ -631,7 +651,7 @@ impl JsBuilderHandle {
   }
 
   #[napi]
-  pub fn status(&self) -> Result<HashMap<String, String>> {
+  pub fn status(&self, _format: Option<String>, _quiet: Option<bool>) -> Result<HashMap<String, String>> {
     let mut map = HashMap::new();
     map.insert("id".to_string(), "buildkit".to_string());
     map.insert("status".to_string(), "running".to_string());
@@ -645,10 +665,10 @@ impl JsBuilderHandle {
 }
 
 #[napi]
-pub struct JsSystemHandle {}
+pub struct SystemHandle {}
 
 #[napi]
-impl JsSystemHandle {
+impl SystemHandle {
   #[napi]
   pub fn start(&self) -> Result<()> {
     Ok(())
@@ -713,10 +733,10 @@ impl JsSystemHandle {
 }
 
 #[napi]
-pub struct JsComposeSystemHandle {}
+pub struct ComposeSystemHandle {}
 
 #[napi]
-impl JsComposeSystemHandle {
+impl ComposeSystemHandle {
   #[napi]
   pub fn status(&self, _socket: Option<String>, _address: Option<String>) -> Result<String> {
     Ok("container-compose daemon running".to_string())
@@ -747,10 +767,10 @@ impl JsComposeSystemHandle {
 }
 
 #[napi]
-pub struct JsComposeHandle {}
+pub struct ComposeHandle {}
 
 #[napi]
-impl JsComposeHandle {
+impl ComposeHandle {
   #[napi]
   pub fn up(&self, _detach: Option<bool>, _build: Option<bool>) -> Result<()> {
     Ok(())
@@ -867,11 +887,127 @@ impl JsComposeHandle {
   }
 
   #[napi(getter)]
-  pub fn system(&self) -> Result<JsComposeSystemHandle> {
-    Ok(JsComposeSystemHandle {})
+  pub fn system(&self) -> Result<ComposeSystemHandle> {
+    Ok(ComposeSystemHandle {})
   }
 }
 
+#[napi]
+pub struct EfiVarStore {
+  inner: InnerEfiVarStore,
+}
+
+#[napi]
+impl EfiVarStore {
+  #[napi(constructor)]
+  pub fn new() -> Self {
+    Self {
+      inner: InnerEfiVarStore::new(),
+    }
+  }
+
+  #[napi]
+  pub fn get_setup_mode(&self) -> bool {
+    self.inner.get_setup_mode()
+  }
+
+  #[napi]
+  pub fn get_secure_boot_enable(&mut self) -> Option<bool> {
+    self.inner.get_secure_boot_enable()
+  }
+
+  #[napi]
+  pub fn set_secure_boot_enable(&mut self, enabled: bool) {
+    self.inner.set_secure_boot_enable(enabled);
+  }
+
+  #[napi]
+  pub fn enroll_pk_mgmt(&mut self) {
+    self.inner.enroll_pk_mgmt();
+  }
+
+  #[napi]
+  pub fn enroll_pk_redhat(&mut self) {
+    self.inner.enroll_pk_redhat();
+  }
+
+  #[napi]
+  pub fn enroll_pk_microsoft(&mut self) {
+    self.inner.enroll_pk_microsoft();
+  }
+
+  #[napi]
+  pub fn enroll_kek_microsoft(&mut self) {
+    self.inner.enroll_kek_microsoft();
+  }
+
+  #[napi]
+  pub fn enroll_db_microsoft_uefi(&mut self) {
+    self.inner.enroll_db_microsoft_uefi();
+  }
+
+  #[napi]
+  pub fn enroll_dbx_native(&mut self) {
+    self.inner.enroll_dbx_native();
+  }
+
+  #[napi]
+  pub fn fs_inode_index(&self) -> u32 {
+    self.inner.fs_inode_index()
+  }
+
+  #[napi]
+  pub fn fs_inode_is_used(&self, inode: u32) -> bool {
+    self.inner.fs_inode_is_used(inode)
+  }
+
+  #[napi]
+  pub fn fs_clear_modified(&mut self) {
+    self.inner.fs_clear_modified();
+  }
+
+  #[napi]
+  pub fn policy_lock(&mut self) {
+    self.inner.policy_lock();
+  }
+
+  #[napi]
+  pub fn quirk_disable_shim_reboot(&mut self, enabled: bool) {
+    self.inner.quirk_disable_shim_reboot(enabled);
+  }
+
+  #[napi]
+  pub fn quirk_fallback_verbose(&mut self, enabled: bool) {
+    self.inner.quirk_fallback_verbose(enabled);
+  }
+
+  #[napi]
+  pub fn quirk_shim_verbose(&mut self, enabled: bool) {
+    self.inner.quirk_shim_verbose(enabled);
+  }
+
+  #[napi]
+  pub fn reset(&mut self) {
+    self.inner.reset();
+  }
+
+  #[napi]
+  pub fn end_of_dxe(&mut self) {
+    self.inner.end_of_dxe();
+  }
+
+  #[napi]
+  pub fn ready_to_boot(&mut self) {
+    self.inner.ready_to_boot();
+  }
+
+  #[napi]
+  pub fn exit_boot_service(&mut self) {
+    self.inner.exit_boot_service();
+  }
+}
+
+// Backward-compatibility exports
 #[napi]
 pub struct JsEfiVarStore {
   inner: EfiVarStore,
@@ -990,22 +1126,22 @@ impl JsEfiVarStore {
 #[derive(Default)]
 struct InnerContainerState {
   _home_dir: String,
-  containers: HashMap<String, JsContainerInfo>,
+  containers: HashMap<String, ContainerInfo>,
   created_total: i64,
 }
 
 static DEFAULT_RUNTIME_STATE: Mutex<Option<Arc<Mutex<InnerContainerState>>>> = Mutex::new(None);
 
 #[napi]
-pub struct JsContainer {
+pub struct Container {
   inner: Arc<Mutex<InnerContainerState>>,
   id: Option<String>,
 }
 
 #[napi]
-impl JsContainer {
+impl Container {
   #[napi(constructor)]
-  pub fn new(options: Option<JsOptions>) -> Result<Self> {
+  pub fn new(options: Option<Options>) -> Result<Self> {
     let home_dir = options
       .and_then(|o| o.home_dir)
       .unwrap_or_else(|| "~/.container".to_string());
@@ -1041,7 +1177,7 @@ impl JsContainer {
   }
 
   #[napi]
-  pub fn init_default(options: JsOptions) -> Result<()> {
+  pub fn init_default(options: Options) -> Result<()> {
     let home_dir = options
       .home_dir
       .unwrap_or_else(|| "~/.container".to_string());
@@ -1058,7 +1194,7 @@ impl JsContainer {
   }
 
   #[napi(factory)]
-  pub fn rest(options: JsContainerRestOptions) -> Result<Self> {
+  pub fn rest(options: ContainerRestOptions) -> Result<Self> {
     let endpoint = options.endpoint.unwrap_or_else(|| "http://localhost".to_string());
     Ok(Self {
       inner: Arc::new(Mutex::new(InnerContainerState {
@@ -1071,17 +1207,17 @@ impl JsContainer {
   }
 
   #[napi(js_name = "importContainer")]
-  pub async fn import_container(&self, _archive_path: String, name: Option<String>) -> Result<JsContainer> {
+  pub async fn import_container(&self, _archive_path: String, name: Option<String>) -> Result<Container> {
     let container_id = format!("cnt_{}", name.as_deref().unwrap_or("imported"));
     let mut state = self
       .inner
       .lock()
       .map_err(|e| Error::from_reason(e.to_string()))?;
     state.created_total += 1;
-    let info = JsContainerInfo {
+    let info = ContainerInfo {
       id: container_id.clone(),
       name: name.clone(),
-      state: JsContainerStateInfo {
+      state: ContainerStateInfo {
         status: "running".to_string(),
         running: true,
         pid: Some(100),
@@ -1097,8 +1233,8 @@ impl JsContainer {
       auto_stop: 0,
       auto_delete: 0,
       auto_resume: false,
-      health_status: JsHealthStatus {
-        state: JsHealthState::None,
+      health_status: HealthStatus {
+        state: HealthState::None,
         failures: 0,
         last_check: None,
       },
@@ -1107,24 +1243,24 @@ impl JsContainer {
     if let Some(ref n) = name {
       state.containers.insert(n.clone(), info);
     }
-    Ok(JsContainer {
+    Ok(Container {
       inner: Arc::clone(&self.inner),
       id: Some(container_id),
     })
   }
 
   #[napi]
-  pub async fn create(&self, options: JsContainerOptions, name: Option<String>) -> Result<JsContainer> {
+  pub async fn create(&self, options: ContainerOptions, name: Option<String>) -> Result<Container> {
     let container_id = format!("cnt_{}", name.as_deref().unwrap_or("default"));
     let mut state = self
       .inner
       .lock()
       .map_err(|e| Error::from_reason(e.to_string()))?;
     state.created_total += 1;
-    let info = JsContainerInfo {
+    let info = ContainerInfo {
       id: container_id.clone(),
       name: name.clone(),
-      state: JsContainerStateInfo {
+      state: ContainerStateInfo {
         status: "configured".to_string(),
         running: false,
         pid: None,
@@ -1140,8 +1276,8 @@ impl JsContainer {
       auto_stop: 0,
       auto_delete: 0,
       auto_resume: false,
-      health_status: JsHealthStatus {
-        state: JsHealthState::None,
+      health_status: HealthStatus {
+        state: HealthState::None,
         failures: 0,
         last_check: None,
       },
@@ -1150,7 +1286,7 @@ impl JsContainer {
     if let Some(ref n) = name {
       state.containers.insert(n.clone(), info);
     }
-    Ok(JsContainer {
+    Ok(Container {
       inner: Arc::clone(&self.inner),
       id: Some(container_id),
     })
@@ -1209,7 +1345,7 @@ impl JsContainer {
   }
 
   #[napi]
-  pub async fn inspect(&self) -> Result<JsContainerInfo> {
+  pub async fn inspect(&self) -> Result<ContainerInfo> {
     let id = self.id.clone().unwrap_or_else(|| "default".to_string());
     let state = self
       .inner
@@ -1278,9 +1414,9 @@ impl JsContainer {
   #[napi]
   pub async fn get_or_create(
     &self,
-    options: JsContainerOptions,
+    options: ContainerOptions,
     name: Option<String>,
-  ) -> Result<JsGetOrCreateResult> {
+  ) -> Result<GetOrCreateResult> {
     let existing_id = {
       let state = self
         .inner
@@ -1291,25 +1427,25 @@ impl JsContainer {
     };
 
     if let Some(id) = existing_id {
-      let container = JsContainer {
+      let container = Container {
         inner: Arc::clone(&self.inner),
         id: Some(id),
       };
-      return Ok(JsGetOrCreateResult {
+      return Ok(GetOrCreateResult {
         inner_container: container,
         created: false,
       });
     }
 
     let container = self.create(options, name).await?;
-    Ok(JsGetOrCreateResult {
+    Ok(GetOrCreateResult {
       inner_container: container,
       created: true,
     })
   }
 
   #[napi]
-  pub async fn list_info(&self) -> Result<Vec<JsContainerInfo>> {
+  pub async fn list_info(&self) -> Result<Vec<ContainerInfo>> {
     let state = self
       .inner
       .lock()
@@ -1325,7 +1461,7 @@ impl JsContainer {
   }
 
   #[napi]
-  pub async fn get_info(&self, id_or_name: String) -> Result<Option<JsContainerInfo>> {
+  pub async fn get_info(&self, id_or_name: String) -> Result<Option<ContainerInfo>> {
     let state = self
       .inner
       .lock()
@@ -1334,13 +1470,13 @@ impl JsContainer {
   }
 
   #[napi]
-  pub async fn get(&self, id_or_name: String) -> Result<Option<JsContainer>> {
+  pub async fn get(&self, id_or_name: String) -> Result<Option<Container>> {
     let state = self
       .inner
       .lock()
       .map_err(|e| Error::from_reason(e.to_string()))?;
     if let Some(info) = state.containers.get(&id_or_name) {
-      Ok(Some(JsContainer {
+      Ok(Some(Container {
         inner: Arc::clone(&self.inner),
         id: Some(info.id.clone()),
       }))
@@ -1350,7 +1486,7 @@ impl JsContainer {
   }
 
   #[napi]
-  pub async fn metrics(&self) -> Result<JsRuntimeMetrics> {
+  pub async fn metrics(&self) -> Result<RuntimeMetrics> {
     let state = self
       .inner
       .lock()
@@ -1360,55 +1496,55 @@ impl JsContainer {
       .values()
       .filter(|c| c.state.status == "running")
       .count() as i64;
-    Ok(JsRuntimeMetrics {
+    Ok(RuntimeMetrics {
       containeres_created_total: state.created_total,
       num_running_containeres: running,
     })
   }
 
   #[napi(getter)]
-  pub fn images(&self) -> Result<JsImageHandle> {
-    Ok(JsImageHandle {})
+  pub fn images(&self) -> Result<ImageHandle> {
+    Ok(ImageHandle {})
   }
 
   #[napi(getter)]
-  pub fn volumes(&self) -> Result<JsVolumeHandle> {
-    Ok(JsVolumeHandle {})
+  pub fn volumes(&self) -> Result<VolumeHandle> {
+    Ok(VolumeHandle {})
   }
 
   #[napi(getter)]
-  pub fn machines(&self) -> Result<JsMachineHandle> {
-    Ok(JsMachineHandle {})
+  pub fn machines(&self) -> Result<MachineHandle> {
+    Ok(MachineHandle {})
   }
 
   #[napi(getter, js_name = "k8s")]
-  pub fn k8s(&self) -> Result<JsK8sHandle> {
-    Ok(JsK8sHandle {})
+  pub fn k8s(&self) -> Result<K8sHandle> {
+    Ok(K8sHandle {})
   }
 
   #[napi(getter)]
-  pub fn network(&self) -> Result<JsNetworkHandle> {
-    Ok(JsNetworkHandle {})
+  pub fn network(&self) -> Result<NetworkHandle> {
+    Ok(NetworkHandle {})
   }
 
   #[napi(getter)]
-  pub fn registry(&self) -> Result<JsRegistryHandle> {
-    Ok(JsRegistryHandle {})
+  pub fn registry(&self) -> Result<RegistryHandle> {
+    Ok(RegistryHandle {})
   }
 
   #[napi(getter)]
-  pub fn system(&self) -> Result<JsSystemHandle> {
-    Ok(JsSystemHandle {})
+  pub fn system(&self) -> Result<SystemHandle> {
+    Ok(SystemHandle {})
   }
 
   #[napi(getter)]
-  pub fn builder(&self) -> Result<JsBuilderHandle> {
-    Ok(JsBuilderHandle {})
+  pub fn builder(&self) -> Result<BuilderHandle> {
+    Ok(BuilderHandle {})
   }
 
   #[napi(getter)]
-  pub fn compose(&self) -> Result<JsComposeHandle> {
-    Ok(JsComposeHandle {})
+  pub fn compose(&self) -> Result<ComposeHandle> {
+    Ok(ComposeHandle {})
   }
 
   #[napi]
@@ -1441,22 +1577,37 @@ impl JsContainer {
   }
 }
 
+// Backward-compatibility export
 #[napi]
-pub struct JsGetOrCreateResult {
-  inner_container: JsContainer,
+pub struct JsContainer {
+  inner: Arc<Mutex<InnerContainerState>>,
+  id: Option<String>,
+}
+
+#[napi]
+impl JsContainer {
+  #[napi(factory)]
+  pub fn with_default_config() -> Result<Container> {
+    Container::with_default_config()
+  }
+}
+
+#[napi]
+pub struct GetOrCreateResult {
+  inner_container: Container,
   created: bool,
 }
 
 #[napi]
-impl JsGetOrCreateResult {
+impl GetOrCreateResult {
   #[napi(getter)]
   pub fn created(&self) -> bool {
     self.created
   }
 
   #[napi(getter, js_name = "container")]
-  pub fn get_container(&self) -> JsContainer {
-    JsContainer {
+  pub fn get_container(&self) -> Container {
+    Container {
       inner: Arc::clone(&self.inner_container.inner),
       id: self.inner_container.id.clone(),
     }
