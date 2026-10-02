@@ -1,5 +1,4 @@
 import native from "../../build/index.js";
-import type { Container } from "../lib.ts";
 
 export class ContainerRegistryCliHandler {
   private registryCli: InstanceType<typeof native.ContainerRegistryCli>;
@@ -8,11 +7,11 @@ export class ContainerRegistryCliHandler {
     this.registryCli = new native.ContainerRegistryCli();
   }
 
-  async login(server: String, username?: string, password?: string): Promise<string> {
+  async login(server: string, username?: string, password?: string): Promise<string> {
     return this.registryCli.login(server, username, password);
   }
 
-  async logout(server: String): Promise<string> {
+  async logout(server: string): Promise<string> {
     return this.registryCli.logout(server);
   }
 

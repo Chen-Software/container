@@ -1,11 +1,13 @@
 import { expect, test } from "vite-plus/test";
 import {
+  Container,
   ContainerBuildCli,
   ContainerRegistryCli,
   ContainerSystemCli,
   ContainerSystemConfigLoader,
 } from "../lib.ts";
-import { Container, handleContainerBuild } from "./container-build.ts";
+import { handleContainerBuild } from "./container-build.ts";
+import { ContainerComposeCliHandler } from "./container-compose.ts";
 import { ContainerRegistryCliHandler } from "./container-registry.ts";
 import { ContainerSystemCliHandler } from "./container-system.ts";
 
@@ -21,11 +23,28 @@ test("handleContainerBuild function works", async () => {
   expect(result).toBe("built image from ./my-app");
 });
 
-test("Container.build function works under global declaration", async () => {
+test("Container.build function works under declaration merging", async () => {
   const fn = (Container as unknown as { build: (dir: string) => Promise<string> }).build;
   expect(fn).toBeDefined();
   const result = await fn("./my-app");
   expect(result).toBe("built image from ./my-app");
+});
+
+test("Container merged static properties (registry, system, compose) work", async () => {
+  const containerObj = Container as unknown as {
+    registry: ContainerRegistryCliHandler;
+    system: ContainerSystemCliHandler;
+    compose: ContainerComposeCliHandler;
+  };
+
+  expect(containerObj.registry).toBeDefined();
+  expect(await containerObj.registry.login("ghcr.io", "user")).toBe("logged into registry ghcr.io as user");
+
+  expect(containerObj.system).toBeDefined();
+  expect(await containerObj.system.status()).toBe("running");
+
+  expect(containerObj.compose).toBeDefined();
+  expect(await containerObj.compose.version()).toContain("container-compose");
 });
 
 test("ContainerRegistryCli and ContainerRegistryCliHandler work", async () => {

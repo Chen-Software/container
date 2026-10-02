@@ -1,103 +1,79 @@
-import { Container, type ComposeHandle } from "../lib.ts";
+import native from "../../build/index.js";
 
 export class ContainerComposeCliHandler {
-  private composeHandle: ComposeHandle;
+  private composeCli: InstanceType<typeof native.ContainerComposeCli>;
 
-  constructor(runtime?: Container) {
-    const rt = runtime ?? Container.withDefaultConfig();
-    this.composeHandle = rt.compose;
+  constructor() {
+    this.composeCli = new native.ContainerComposeCli();
   }
 
-  async up(detach?: boolean, build?: boolean): Promise<void> {
-    return this.composeHandle.up(detach, build);
+  async up(detach?: boolean, build?: boolean): Promise<string> {
+    return this.composeCli.up(detach, build);
   }
 
-  async down(volumes?: boolean): Promise<void> {
-    return this.composeHandle.down(volumes);
+  async down(volumes?: boolean): Promise<string> {
+    return this.composeCli.down(volumes);
   }
 
-  async start(): Promise<void> {
-    return this.composeHandle.start();
+  async start(): Promise<string> {
+    return this.composeCli.start();
   }
 
-  async stop(): Promise<void> {
-    return this.composeHandle.stop();
+  async stop(): Promise<string> {
+    return this.composeCli.stop();
   }
 
-  async restart(): Promise<void> {
-    return this.composeHandle.restart();
-  }
-
-  async create(): Promise<void> {
-    return this.composeHandle.create();
-  }
-
-  async kill(signal?: string): Promise<void> {
-    return this.composeHandle.kill(signal);
-  }
-
-  async rm(force?: boolean): Promise<void> {
-    return this.composeHandle.rm(force);
+  async restart(): Promise<string> {
+    return this.composeCli.restart();
   }
 
   async ps(): Promise<string[]> {
-    return this.composeHandle.ps();
+    return this.composeCli.ps();
   }
 
   async ls(): Promise<string[]> {
-    return this.composeHandle.ls();
+    return this.composeCli.ls();
   }
 
   async logs(follow?: boolean): Promise<string[]> {
-    return this.composeHandle.logs(follow);
+    return this.composeCli.logs(follow);
   }
 
-  async top(): Promise<string[]> {
-    return this.composeHandle.top();
-  }
-
-  async port(service: string, privatePort: number): Promise<string> {
-    return this.composeHandle.port(service, privatePort);
-  }
-
-  async events(): Promise<string[]> {
-    return this.composeHandle.events();
+  async build(): Promise<string> {
+    return this.composeCli.build();
   }
 
   async config(): Promise<string> {
-    return this.composeHandle.config();
-  }
-
-  async build(): Promise<void> {
-    return this.composeHandle.build();
+    return this.composeCli.config();
   }
 
   async run(service: string, command?: string[]): Promise<number> {
-    return this.composeHandle.run(service, command);
+    return this.composeCli.run(service, command);
   }
 
   async exec(service: string, command: string[]): Promise<number> {
-    return this.composeHandle.exec(service, command);
-  }
-
-  async watch(): Promise<void> {
-    return this.composeHandle.watch();
-  }
-
-  async pull(): Promise<void> {
-    return this.composeHandle.pull();
-  }
-
-  async push(): Promise<void> {
-    return this.composeHandle.push();
-  }
-
-  async serve(): Promise<void> {
-    return this.composeHandle.serve();
+    return this.composeCli.exec(service, command);
   }
 
   async version(): Promise<string> {
-    return this.composeHandle.version();
+    return this.composeCli.version();
+  }
+
+  async status(): Promise<Record<string, string>> {
+    return this.composeCli.status();
+  }
+}
+
+export const containerComposeHandler = new ContainerComposeCliHandler();
+
+const ContainerRef = native.Container;
+if (ContainerRef) {
+  (ContainerRef as unknown as { compose: typeof containerComposeHandler }).compose = containerComposeHandler;
+}
+
+declare module "../lib.ts" {
+  namespace Container {
+    const compose: ContainerComposeCliHandler;
   }
 }
 

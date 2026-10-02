@@ -1,5 +1,4 @@
 import native from "../../build/index.js";
-import type { Container } from "../lib.ts";
 
 export class ContainerSystemCliHandler {
   private systemCli: InstanceType<typeof native.ContainerSystemCli>;

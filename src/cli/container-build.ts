@@ -14,9 +14,9 @@ export async function handleContainerBuild(
 }
 
 // Attach `build` function under Container.*
-const Container = native.Container;
-if (Container) {
-  (Container as unknown as { build: typeof handleContainerBuild }).build = handleContainerBuild;
+const ContainerRef = native.Container;
+if (ContainerRef) {
+  (ContainerRef as unknown as { build: typeof handleContainerBuild }).build = handleContainerBuild;
 }
 
 declare module "../lib.ts" {
@@ -25,5 +25,4 @@ declare module "../lib.ts" {
   }
 }
 
-export { Container };
 export default handleContainerBuild;
