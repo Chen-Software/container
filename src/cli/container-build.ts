@@ -14,3 +14,7 @@ export class ContainerBuildHandler {
 }
 
 export const handleContainerBuild = ContainerBuildHandler.handleBuild;
+
+export namespace ContainerBuild {
+  export const build = ContainerBuildHandler.handleBuild;
+}
