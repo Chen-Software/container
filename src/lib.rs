@@ -5,6 +5,7 @@ use napi_derive::napi;
 use virtfw_varstore::store::EfiVarStore as VirtfwEfiVarStore;
 
 pub mod cli;
+pub mod config;
 
 #[napi(object)]
 #[derive(Clone, Debug, Default)]

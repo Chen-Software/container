@@ -22,6 +22,9 @@ export const ComposeSystemHandle = native.ComposeSystemHandle;
 export const ContainerCli = native.ContainerCli;
 export const ContainerBuildCli = native.ContainerBuildCli;
 export const ContainerComposeCli = native.ContainerComposeCli;
+export const ContainerRegistryCli = native.ContainerRegistryCli;
+export const ContainerSystemCli = native.ContainerSystemCli;
+export const ContainerSystemConfigLoader = native.ContainerSystemConfigLoader;
 
 export const HealthState = {
   None: "None",

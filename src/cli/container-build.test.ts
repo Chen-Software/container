@@ -1,6 +1,13 @@
 import { expect, test } from "vite-plus/test";
-import { ContainerBuildCli } from "../lib.ts";
+import {
+  ContainerBuildCli,
+  ContainerRegistryCli,
+  ContainerSystemCli,
+  ContainerSystemConfigLoader,
+} from "../lib.ts";
 import { Container, handleContainerBuild } from "./container-build.ts";
+import { ContainerRegistryCliHandler } from "./container-registry.ts";
+import { ContainerSystemCliHandler } from "./container-system.ts";
 
 test("ContainerBuildCli NAPI bindings work directly", () => {
   const cli = new ContainerBuildCli();
@@ -19,4 +26,44 @@ test("Container.build function works under global declaration", async () => {
   expect(fn).toBeDefined();
   const result = await fn("./my-app");
   expect(result).toBe("built image from ./my-app");
+});
+
+test("ContainerRegistryCli and ContainerRegistryCliHandler work", async () => {
+  const cli = new ContainerRegistryCli();
+  expect(cli.login("docker.io", "user", "pass")).toBe("logged into registry docker.io as user");
+  expect(cli.logout("docker.io")).toBe("logged out from registry docker.io");
+
+  const handler = new ContainerRegistryCliHandler();
+  expect(await handler.login("docker.io", "admin")).toBe("logged into registry docker.io as admin");
+});
+
+test("ContainerSystemCli and ContainerSystemCliHandler work", async () => {
+  const cli = new ContainerSystemCli();
+  expect(cli.start()).toBe("system started");
+  expect(cli.status()).toBe("running");
+
+  const handler = new ContainerSystemCliHandler();
+  expect(await handler.status()).toBe("running");
+});
+
+test("ContainerSystemConfigLoader parses TOML config", () => {
+  const toml = `
+[build]
+rosetta = true
+cpus = 4
+memory = "4096mb"
+image = "custom-builder:latest"
+
+[container]
+cpus = 8
+memory = "2gb"
+
+[registry]
+domain = "ghcr.io"
+`;
+  const config = ContainerSystemConfigLoader.parse(toml);
+  expect(config.build.cpus).toBe(4);
+  expect(config.build.rosetta).toBe(true);
+  expect(config.container.cpus).toBe(8);
+  expect(config.registry.domain).toBe("ghcr.io");
 });
