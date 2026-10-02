@@ -1,5 +1,9 @@
 pub mod cli;
+pub mod config;
 
+use cli::{
+  ContainerSystemCliHandler, RegistryCliHandler, RegistryListOptions, RegistryLoginOptions,
+};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use napi::bindgen_prelude::*;
@@ -620,18 +624,35 @@ pub struct RegistryHandle {}
 #[napi]
 impl RegistryHandle {
   #[napi]
-  pub fn login(&self, _server: String, _username: Option<String>, _password: Option<String>) -> Result<()> {
-    Ok(())
+  pub fn login(
+    &self,
+    server: String,
+    username: Option<String>,
+    password: Option<String>,
+    password_stdin: Option<bool>,
+    scheme: Option<String>,
+  ) -> Result<()> {
+    RegistryCliHandler::login(RegistryLoginOptions {
+      server,
+      username,
+      password,
+      password_stdin: password_stdin.unwrap_or(false),
+      scheme,
+    })
+    .map_err(Error::from_reason)
   }
 
   #[napi]
-  pub fn logout(&self, _server: String) -> Result<()> {
-    Ok(())
+  pub fn logout(&self, server: String) -> Result<()> {
+    RegistryCliHandler::logout(&server).map_err(Error::from_reason)
   }
 
   #[napi]
-  pub fn list(&self) -> Vec<String> {
-    vec![]
+  pub fn list(&self, format: Option<String>, quiet: Option<bool>) -> Result<Vec<HashMap<String, String>>> {
+    Ok(RegistryCliHandler::list(RegistryListOptions {
+      format,
+      quiet: quiet.unwrap_or(false),
+    }))
   }
 }
 
@@ -681,7 +702,7 @@ impl SystemHandle {
 
   #[napi]
   pub fn status(&self) -> Result<String> {
-    Ok("running".to_string())
+    Ok(ContainerSystemCliHandler::status())
   }
 
   #[napi]
@@ -694,41 +715,37 @@ impl SystemHandle {
 
   #[napi]
   pub fn df(&self) -> Result<HashMap<String, String>> {
-    let mut map = HashMap::new();
-    map.insert("reclaimable".to_string(), "0B".to_string());
-    Ok(map)
+    Ok(ContainerSystemCliHandler::df())
   }
 
   #[napi]
-  pub fn logs(&self, _follow: Option<bool>, _last: Option<String>) -> Result<Vec<String>> {
-    Ok(vec![])
+  pub fn logs(&self, follow: Option<bool>, last: Option<String>) -> Result<Vec<String>> {
+    Ok(ContainerSystemCliHandler::logs(follow, last))
   }
 
   #[napi]
   pub fn list_properties(&self) -> Result<HashMap<String, String>> {
-    let mut map = HashMap::new();
-    map.insert("log.level".to_string(), "info".to_string());
-    Ok(map)
+    Ok(ContainerSystemCliHandler::list_properties())
   }
 
   #[napi]
-  pub fn dns_create(&self, domain: String, _ip: Option<String>) -> Result<String> {
-    Ok(domain)
+  pub fn dns_create(&self, domain: String, ip: Option<String>) -> Result<String> {
+    ContainerSystemCliHandler::dns_create(domain, ip).map_err(Error::from_reason)
   }
 
   #[napi]
   pub fn dns_list(&self) -> Result<Vec<HashMap<String, String>>> {
-    Ok(vec![])
+    Ok(ContainerSystemCliHandler::dns_list())
   }
 
   #[napi]
-  pub fn dns_delete(&self, _domain: String) -> Result<()> {
-    Ok(())
+  pub fn dns_delete(&self, domain: String) -> Result<()> {
+    ContainerSystemCliHandler::dns_delete(&domain).map_err(Error::from_reason)
   }
 
   #[napi]
   pub fn kernel_set(&self, path: String) -> Result<String> {
-    Ok(path)
+    ContainerSystemCliHandler::kernel_set(path).map_err(Error::from_reason)
   }
 }
 

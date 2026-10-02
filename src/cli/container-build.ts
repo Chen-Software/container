@@ -14,3 +14,7 @@ export class ContainerBuildHandler {
 }
 
 export const handleContainerBuild = ContainerBuildHandler.handleBuild;
+
+export const ContainerBuild = {
+  build: (params: ContainerBuildParams = {}) => ContainerBuildHandler.handleBuild(params),
+};
